@@ -1,0 +1,44 @@
+name: Deploy .NET app to Azure Web App
+
+on:
+  push:
+    branches:
+      - dev
+      - prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '7.0.x'
+
+    - name: Publish .NET Core app
+      run: dotnet publish -c Release -o ./publish
+
+    - name: Determine target app service
+      id: determine-app-service
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          echo "app-name=SampleAppServiceDevAbd" >> $GITHUB_ENV
+          echo "publish-profile=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEV }}" >> $GITHUB_ENV
+        elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+          echo "app-name=SampleAppServiceProdAbd" >> $GITHUB_ENV
+          echo "publish-profile=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PROD }}" >> $GITHUB_ENV
+        else
+          echo "This branch does not trigger deployments."
+          exit 1
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.app-name }}
+        publish-profile: ${{ env.publish-profile }}
+        package: ./publish
+
