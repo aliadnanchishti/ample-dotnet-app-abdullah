@@ -6,39 +6,48 @@ on:
       - dev
       - prod
 
+env:
+  AZURE_WEBAPP_NAME_DEV: SampleAppServiceDevAbd    # Set this to your development app's name
+  AZURE_WEBAPP_NAME_PROD: SampleAppServiceProdAbd  # Set this to your production app's name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'                   # Set this to the path to your web app project, defaults to the repository root
+  DOTNET_VERSION: '7.0.x'                          # Set this to the dot net version to use
+
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      # Checkout the repo
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      # Setup .NET Core SDK
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      # Run dotnet build and publish
+      - name: Build and publish
+        run: |
+          dotnet restore
+          dotnet build --configuration Release
+          dotnet publish -c Release --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/publish
+      
+      # Deploy to Dev environment
+      - name: Deploy to Dev
+        if: github.ref == 'refs/heads/dev'
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME_DEV }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEV }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/publish
 
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '7.0.x'
-
-    - name: Publish .NET Core app
-      run: dotnet publish -c Release -o ./publish
-
-    - name: Determine target app service
-      id: determine-app-service
-      run: |
-        if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-          echo "app-name=SampleAppServiceDevAbd" >> $GITHUB_ENV
-          echo "publish-profile=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEV }}" >> $GITHUB_ENV
-        elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
-          echo "app-name=SampleAppServiceProdAbd" >> $GITHUB_ENV
-          echo "publish-profile=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PROD }}" >> $GITHUB_ENV
-        else
-          echo "This branch does not trigger deployments."
-          exit 1
-      shell: bash
-
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: ${{ env.app-name }}
-        publish-profile: ${{ env.publish-profile }}
-        package: ./publish
+      # Deploy to Prod environment
+      - name: Deploy to Prod
+        if: github.ref == 'refs/heads/prod'
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME_PROD }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PROD }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/publish
