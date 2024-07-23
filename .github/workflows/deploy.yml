@@ -34,6 +34,7 @@ jobs:
         else
           echo "This branch does not trigger deployments."
           exit 1
+      shell: bash
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
@@ -41,4 +42,3 @@ jobs:
         app-name: ${{ env.app-name }}
         publish-profile: ${{ env.publish-profile }}
         package: ./publish
-
